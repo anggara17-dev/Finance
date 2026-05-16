@@ -49,7 +49,10 @@ export default function App() {
   const [spreadsheetId, setSpreadsheetId] = useState<string | null>(() => localStorage.getItem("google_spreadsheet_id"));
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"DASHBOARD" | "INPUT" | "REKAP" | "LABA_RUGI" | "NERACA" | "SETTINGS">("DASHBOARD");
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => {
+    const saved = localStorage.getItem("local_transactions");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [appName, setAppName] = useState(() => localStorage.getItem("appName") || "Keuangan 2026");
   const [isSyncing, setIsSyncing] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -102,6 +105,12 @@ export default function App() {
     }
   }, [spreadsheetId]);
 
+  useEffect(() => {
+    if (user?.uid === "guest" || !spreadsheetId || !accessToken || accessToken === "demo-token") {
+      localStorage.setItem("local_transactions", JSON.stringify(transactions));
+    }
+  }, [transactions, user, spreadsheetId, accessToken]);
+
   const findOrCreateSpreadsheet = async (token: string) => {
     setIsSyncing(true);
     try {
@@ -133,22 +142,29 @@ export default function App() {
     }
     setIsSyncing(true);
     try {
-      const data = await readSheetValues(sid, "INPUT!A2:I", token);
-      if (data.values) {
-        const mapped: Transaction[] = data.values.map((row: any[]) => ({
-          date: row[0] || "",
-          month: row[1] || "",
-          quarter: row[2] || "",
-          category: row[3] || "",
-          accountType: row[4] || "",
-          description: row[5] || "",
-          debit: parseFloat(row[6]) || 0,
-          kredit: parseFloat(row[7]) || 0,
-          timestamp: row[8] || ""
-        }));
-        setTransactions(mapped);
+      if (sid && token && token !== "demo-token") {
+        const data = await readSheetValues(sid, "INPUT!A2:I", token);
+        if (data.values) {
+          const mapped: Transaction[] = data.values.map((row: any[]) => ({
+            date: row[0] || "",
+            month: row[1] || "",
+            quarter: row[2] || "",
+            category: row[3] || "",
+            accountType: row[4] || "",
+            description: row[5] || "",
+            debit: parseFloat(row[6]) || 0,
+            kredit: parseFloat(row[7]) || 0,
+            timestamp: row[8] || ""
+          }));
+          setTransactions(mapped);
+          localStorage.setItem("local_transactions", JSON.stringify(mapped));
+        } else {
+          setTransactions([]);
+        }
       } else {
-        setTransactions([]);
+        // Load from local if no connection
+        const saved = localStorage.getItem("local_transactions");
+        if (saved) setTransactions(JSON.parse(saved));
       }
     } catch (err: any) {
       console.error("Fetch error:", err);
@@ -332,13 +348,22 @@ export default function App() {
               </div>
 
               {authError && (
-                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-xs font-medium flex items-start gap-2">
-                  <div className="mt-0.5 shrink-0"><Lock size={14} /></div>
-                  <span>
-                    {authError.includes("operation-not-allowed") 
-                      ? "Metode login ini belum diaktifkan di Firebase Console. Silakan gunakan Google Login." 
-                      : authError}
-                  </span>
+                <div className="p-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-700 text-[11px] font-medium space-y-2">
+                  <div className="flex items-start gap-2">
+                    <div className="mt-0.5 shrink-0"><ShieldCheck size={14} className="text-orange-600" /></div>
+                    <span>{authError}</span>
+                  </div>
+                  {(authError.includes("operation-not-allowed") || authError.includes("unauthorized-domain")) && (
+                    <div className="bg-white/80 p-2 rounded-lg border border-orange-200 mt-2 text-text-primary">
+                      <p className="font-bold mb-1 underline">Cara Memperbaiki:</p>
+                      <ol className="list-decimal list-inside space-y-1 opacity-90">
+                        <li>Buka <a href="https://console.firebase.google.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">Firebase Console</a></li>
+                        <li>Menu <b>Authentication</b> &gt; <b>Sign-in method</b></li>
+                        <li>Klik <b>Add new provider</b> &gt; aktifkan <b>Google</b> DAN <b>Email/Password</b></li>
+                        <li>Di tab <b>Settings</b> &gt; <b>Authorized domains</b>, tambahkan domain <code>anggara17-dev.github.io</code></li>
+                      </ol>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -501,6 +526,7 @@ export default function App() {
                   spreadsheetId={spreadsheetId!} 
                   accessToken={accessToken!} 
                   transactions={transactions}
+                  setTransactions={setTransactions}
                   setNotification={setNotification}
                   user={user}
                   onSuccess={() => fetchData(spreadsheetId!, accessToken!)} 
@@ -717,7 +743,7 @@ function StatCard({ label, val, color = "text-text-primary", isCurrency = true }
   );
 }
 
-function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess, setNotification, user }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], onSuccess: () => void, setNotification: any, user: any }) {
+function TransactionPanel({ spreadsheetId, accessToken, transactions, setTransactions, onSuccess, setNotification, user }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], setTransactions: (t: Transaction[]) => void, onSuccess: () => void, setNotification: any, user: any }) {
   const [formData, setFormData] = useState({ date: format(new Date(), "yyyy-MM-dd"), month: getMonthName(new Date().toISOString()), quarter: getQuarter(new Date().toISOString()), category: CATEGORIES_LIST[0], accountType: ACCOUNT_TYPES[0], description: "", debit: "", kredit: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -726,12 +752,20 @@ function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess,
     if (!formData.description) return;
     
     if (!spreadsheetId || !accessToken || accessToken === "demo-token" || user?.uid === "guest") {
-      // Simpan secara lokal saja (opt-in) untuk demo
-      const newTransactions = [...transactions, { ...formData, debit: parseFloat(formData.debit) || 0, kredit: parseFloat(formData.kredit) || 0, timestamp: new Date().toISOString() } as Transaction];
-      // Ini hanya untuk visual sementara di UI jika belum terhubung
-      setNotification({ type: "info", message: "Mode Demo: Transaksi disimpan di memori sementara (tidak ke Google Sheets)." });
+      // Simpan secara lokal untuk demo
+      const newTx: Transaction = { 
+        ...formData, 
+        debit: parseFloat(formData.debit) || 0, 
+        kredit: parseFloat(formData.kredit) || 0, 
+        timestamp: new Date().toISOString() 
+      } as Transaction;
+      
+      const newTransactions = [...transactions, newTx];
+      setTransactions(newTransactions);
+      
+      setNotification({ type: "success", message: "Tersimpan Lokal (Mode Demo)" });
       setFormData({ ...formData, description: "", debit: "", kredit: "" });
-      onSuccess(); // Refresh UI
+      onSuccess(); 
       return;
     }
 
