@@ -814,14 +814,25 @@ function LabaRugiPanel({ transactions }: { transactions: Transaction[] }) {
 function LRSect({ label, val, total, isNeg = false }: { label: string, val: number, total: number, isNeg?: boolean }) {
   const percentage = total > 0 ? (val / total) * 100 : 0;
   return (
-    <div className="group flex justify-between items-center py-2 px-3 rounded-lg hover:bg-bg-tertiary transition-colors">
-      <div className="flex flex-col">
-        <span className="text-[13px] font-bold text-text-primary">{label}</span>
-        <span className="text-[10px] text-text-secondary font-mono">{percentage.toFixed(1)}% dari total</span>
+    <div className="group flex flex-col py-2 px-3 rounded-lg hover:bg-bg-tertiary transition-colors">
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex flex-col">
+          <span className="text-[13px] font-bold text-text-primary">{label}</span>
+        </div>
+        <span className={`font-mono text-sm font-medium ${isNeg ? "text-rose-500" : "text-emerald-600"}`}>
+          {isNeg ? `(${formatCurrency(val)})` : formatCurrency(val)}
+        </span>
       </div>
-      <span className={`font-mono text-sm font-medium ${isNeg ? "text-rose-500" : "text-emerald-600"}`}>
-        {isNeg ? `(${formatCurrency(val)})` : formatCurrency(val)}
-      </span>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-1.5 bg-bg-secondary rounded-full overflow-hidden">
+          <motion.div 
+            initial={{ width: 0 }}
+            animate={{ width: `${percentage}%` }}
+            className={`h-full rounded-full ${isNeg ? "bg-rose-400" : "bg-emerald-400"}`}
+          />
+        </div>
+        <span className="text-[10px] text-text-secondary font-mono w-10 text-right">{percentage.toFixed(1)}%</span>
+      </div>
     </div>
   );
 }
