@@ -793,7 +793,7 @@ function LabaRugiPanel({ transactions }: { transactions: Transaction[] }) {
   );
 }
 
-function LRSect({ label, val, total, isNeg = false }: { label: string, val: number, total: number, isNeg?: boolean }) {
+function LRSect({ label, val, total, isNeg = false }: any) {
   const percentage = total > 0 ? (val / total) * 100 : 0;
   return (
     <div className="group flex flex-col py-2 px-3 rounded-lg hover:bg-bg-tertiary transition-colors">
