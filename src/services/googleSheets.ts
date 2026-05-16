@@ -15,7 +15,10 @@ export async function findSpreadsheet(token: string) {
     headers: { Authorization: `Bearer ${token}` }
   });
   
-  if (!res.ok) throw new Error("Gagal mencari file di Google Drive");
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`Google Drive Error (${res.status}): ${errData.error?.message || res.statusText}`);
+  }
   const data = await res.json();
   return data.files || [];
 }
@@ -41,7 +44,10 @@ export async function createSpreadsheet(token: string) {
     body: JSON.stringify(body)
   });
 
-  if (!res.ok) throw new Error("Gagal membuat spreadsheet baru");
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`Google Sheets Error (${res.status}): ${errData.error?.message || res.statusText}`);
+  }
   const spreadsheet = await res.json();
   const spreadsheetId = spreadsheet.spreadsheetId;
 
@@ -59,7 +65,10 @@ export async function readSheetValues(spreadsheetId: string, range: string, toke
     headers: { Authorization: `Bearer ${token}` }
   });
   
-  if (!res.ok) throw new Error("Gagal membaca data spreadsheet");
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`Google Sheets Error (${res.status}): ${errData.error?.message || res.statusText}`);
+  }
   return await res.json();
 }
 
@@ -74,7 +83,10 @@ export async function appendSheetValues(spreadsheetId: string, range: string, va
     body: JSON.stringify({ values })
   });
   
-  if (!res.ok) throw new Error("Gagal menambah data ke spreadsheet");
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({}));
+    throw new Error(`Google Sheets Error (${res.status}): ${errData.error?.message || res.statusText}`);
+  }
   return await res.json();
 }
 

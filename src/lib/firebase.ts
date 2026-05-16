@@ -22,24 +22,20 @@ provider.addScope("https://www.googleapis.com/auth/spreadsheets");
 provider.addScope("https://www.googleapis.com/auth/drive.file");
 
 let isSigningIn = false;
-let cachedAccessToken: string | null = null;
+let cachedAccessToken: string | null = localStorage.getItem("google_access_token");
 
 export const initAuth = (
-  onAuthSuccess?: (user: User, token: string) => void,
+  onAuthSuccess?: (user: User, token: string | null) => void,
   onAuthFailure?: () => void
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
-        if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
-      } else {
-        // In some cases we might have the user but not the token cached in our local variable
-        // but if we just refreshed, we might need a new sign-in to get a fresh token if we want to be safe
-        // Or we rely on the popup flow to set it.
-        if (onAuthFailure) onAuthFailure();
-      }
+      // Even if token is null, we can have a session. 
+      // But for Sheets, we need the token.
+      if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem("google_access_token");
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -55,6 +51,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    localStorage.setItem("google_access_token", cachedAccessToken);
     return { user: result.user, accessToken: credential.accessToken };
   } catch (error: any) {
     console.error("Sign in error:", error);
@@ -73,6 +70,9 @@ export const linkGoogleAccount = async () => {
   const result = await linkWithPopup(auth.currentUser, provider);
   const credential = GoogleAuthProvider.credentialFromResult(result);
   cachedAccessToken = credential?.accessToken || null;
+  if (cachedAccessToken) {
+    localStorage.setItem("google_access_token", cachedAccessToken);
+  }
   return { user: result.user, accessToken: cachedAccessToken };
 };
 
@@ -81,4 +81,5 @@ export const getAccessToken = () => cachedAccessToken;
 export const logout = async () => {
   await signOut(auth);
   cachedAccessToken = null;
+  localStorage.removeItem("google_access_token");
 };

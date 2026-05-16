@@ -46,7 +46,7 @@ import { findSpreadsheet, createSpreadsheet, readSheetValues, appendSheetValues 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(null);
+  const [spreadsheetId, setSpreadsheetId] = useState<string | null>(() => localStorage.getItem("google_spreadsheet_id"));
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"DASHBOARD" | "INPUT" | "REKAP" | "LABA_RUGI" | "NERACA" | "SETTINGS">("DASHBOARD");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -69,10 +69,21 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = initAuth(
-      (user, token) => {
+      async (user, token) => {
         setUser(user);
         setAccessToken(token);
-        if (token) findOrCreateSpreadsheet(token);
+        if (token) {
+          if (spreadsheetId) {
+            await fetchData(spreadsheetId, token);
+          } else {
+            await findOrCreateSpreadsheet(token);
+          }
+        } else if (user && user.uid !== "guest") {
+          // Logged in but missing token? might need re-login but let's just stop loading
+          setIsLoading(false);
+        } else {
+          setIsLoading(false);
+        }
       },
       () => {
         setUser(null);
@@ -81,7 +92,15 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [spreadsheetId]);
+
+  useEffect(() => {
+    if (spreadsheetId) {
+      localStorage.setItem("google_spreadsheet_id", spreadsheetId);
+    } else {
+      localStorage.removeItem("google_spreadsheet_id");
+    }
+  }, [spreadsheetId]);
 
   const findOrCreateSpreadsheet = async (token: string) => {
     setIsSyncing(true);
@@ -131,8 +150,15 @@ export default function App() {
       } else {
         setTransactions([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Fetch error:", err);
+      if (err.message.includes("401") || err.message.toLowerCase().includes("unauthorized")) {
+        setNotification({ type: "error", message: "Sesi Google berakhir. Silakan hubungkan ulang Google di menu Konfigurasi." });
+        setAccessToken(null);
+        localStorage.removeItem("google_access_token");
+      } else {
+        setNotification({ type: "error", message: `Gagal Sinkron: ${err.message}` });
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -205,6 +231,7 @@ export default function App() {
     setUser(null);
     setAccessToken(null);
     setSpreadsheetId(null);
+    localStorage.removeItem("google_spreadsheet_id");
     setTransactions([]);
   };
 
@@ -436,6 +463,8 @@ export default function App() {
                   spreadsheetId={spreadsheetId!} 
                   accessToken={accessToken!} 
                   transactions={transactions}
+                  setNotification={setNotification}
+                  user={user}
                   onSuccess={() => fetchData(spreadsheetId!, accessToken!)} 
                 />
               )}
@@ -453,6 +482,7 @@ export default function App() {
                   spreadsheetId={spreadsheetId!}
                   setSpreadsheetId={setSpreadsheetId}
                   accessToken={accessToken!}
+                  setNotification={setNotification}
                   onGoogleLink={handleGoogleLink}
                   onImportSuccess={() => fetchData(spreadsheetId!, accessToken!)}
                 />
@@ -649,20 +679,37 @@ function StatCard({ label, val, color = "text-text-primary", isCurrency = true }
   );
 }
 
-function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], onSuccess: () => void }) {
+function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess, setNotification, user }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], onSuccess: () => void, setNotification: any, user: any }) {
   const [formData, setFormData] = useState({ date: format(new Date(), "yyyy-MM-dd"), month: getMonthName(new Date().toISOString()), quarter: getQuarter(new Date().toISOString()), category: CATEGORIES_LIST[0], accountType: ACCOUNT_TYPES[0], description: "", debit: "", kredit: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.description) return;
+    
+    if (user?.uid === "guest") {
+      setNotification({ type: "error", message: "Mode Tamu tidak dapat menyimpan ke Google Sheets. Silakan masuk/daftar akun asli." });
+      return;
+    }
+
+    if (!spreadsheetId || !accessToken || accessToken === "demo-token") {
+      setNotification({ type: "error", message: "Spreadsheet belum terhubung. Silakan hubungkan di menu Konfigurasi." });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const values = [[formData.date, formData.month, formData.quarter, formData.category, formData.accountType, formData.description, parseFloat(formData.debit) || 0, parseFloat(formData.kredit) || 0, new Date().toISOString()]];
       await appendSheetValues(spreadsheetId, "INPUT!A2:I", values, accessToken);
       setFormData({ ...formData, description: "", debit: "", kredit: "" });
+      setNotification({ type: "success", message: "Transaksi berhasil disimpan ke Google Sheets!" });
       onSuccess();
-    } catch (err) { console.error(err); } finally { setIsSubmitting(false); }
+    } catch (err: any) { 
+      console.error(err); 
+      setNotification({ type: "error", message: `Gagal menyimpan: ${err.message}` });
+    } finally { 
+      setIsSubmitting(false); 
+    }
   };
 
   return (
@@ -840,6 +887,7 @@ function SettingsPanel({
   spreadsheetId, 
   setSpreadsheetId,
   accessToken, 
+  setNotification,
   onGoogleLink,
   onImportSuccess 
 }: { 
@@ -849,6 +897,7 @@ function SettingsPanel({
   spreadsheetId: string,
   setSpreadsheetId: (id: string) => void,
   accessToken: string,
+  setNotification: any,
   onGoogleLink: () => void,
   onImportSuccess: () => void
 }) {
@@ -858,7 +907,12 @@ function SettingsPanel({
   const handleUpdateSid = () => {
     if (!newSid) return;
     setSpreadsheetId(newSid);
-    onImportSuccess();
+    if (!accessToken || accessToken === "demo-token") {
+      setNotification({ type: "success", message: "ID Spreadsheet diperbarui secara lokal. Silakan 'Hubungkan Google' untuk sinkronisasi data." });
+    } else {
+      setNotification({ type: "success", message: "ID Spreadsheet diperbarui. Mencoba sinkronisasi..." });
+      onImportSuccess();
+    }
   };
 
   const handleExport = () => {
