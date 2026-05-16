@@ -180,6 +180,10 @@ export default function App() {
         setAuthError("Email ini sudah terdaftar. Silakan gunakan tab 'Masuk'.");
       } else if (err.code === "auth/wrong-password") {
         setAuthError("Password salah. Silakan coba lagi.");
+      } else if (err.code === "auth/operation-not-allowed") {
+        setAuthError("Metode Email/Password belum diaktifkan di Firebase Console > Authentication > Sign-in method.");
+      } else if (err.code === "auth/unauthorized-domain") {
+        setAuthError("Domain ini belum diizinkan. Tambahkan domain github.io ke Authorized Domains di Firebase Console.");
       } else {
         setAuthError(err.message);
       }
@@ -223,11 +227,17 @@ export default function App() {
         setUser(res.user);
         await findOrCreateSpreadsheet(res.accessToken);
       } else {
-        throw new Error("Gagal mendapatkan akses dari Google.");
+        throw new Error("Gagal mendapatkan akses dari Google. Pastikan popup tidak diblokir.");
       }
     } catch (err: any) {
       console.error(err);
-      setNotification({ type: "error", message: `Gagal: ${err.message}` });
+      let errorMsg = err.message;
+      if (err.code === "auth/operation-not-allowed") {
+        errorMsg = "Login Google belum diaktifkan di Firebase Console. Buka console.firebase.google.com > Authentication > Sign-in method dan aktifkan 'Google'.";
+      } else if (err.code === "auth/unauthorized-domain") {
+        errorMsg = "Domain ini belum diizinkan di Firebase. Tambahkan domain github.io Anda di Firebase Console > Authentication > Settings > Authorized domains.";
+      }
+      setNotification({ type: "error", message: errorMsg });
     }
   };
 
