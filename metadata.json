@@ -1,0 +1,6 @@
+{
+  "name": "FinSheet - Accounting Tool",
+  "description": "Professional accounting and financial management system integrated with Google Sheets. Track transactions, generate income statements, and balance sheets per quarter.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Keuangan 2026 Light Style */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8f9fa;
+  --color-bg-tertiary: #f1f3f5;
+  --color-border-primary: #dee2e6;
+  --color-border-secondary: #e9ecef;
+  --color-border-tertiary: #f1f3f5;
+  
+  --color-text-primary: #212529;
+  --color-text-secondary: #6c757d;
+  --color-text-info: #185FA5;
+  
+  --color-pos: #1D9E75;
+  --color-neg: #D85A30;
+}
+
+body {
+  @apply font-sans bg-bg-tertiary text-text-primary;
+}
+
+.lr-table td {
+  @apply border-b border-border-tertiary py-2 px-3;
+}
+
+.lr-table th {
+  @apply border-b border-border-tertiary text-text-secondary text-[10px] uppercase font-bold text-left py-2 px-3;
+}
+
+.rekap-table td, .rekap-table th {
+  @apply border border-border-tertiary p-2 text-right text-xs;
+}
+
+.rekap-table th {
+  @apply bg-bg-secondary font-bold text-text-secondary;
+}
+
+.neraca-row {
+  @apply flex justify-between py-2 border-b border-border-tertiary text-sm;
+}
