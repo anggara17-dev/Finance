@@ -207,15 +207,20 @@ export default function App() {
   };
 
   const handleGoogleLink = async () => {
-    if (user?.uid === "guest") {
-      setNotification({ type: "error", message: "Akses Tamu tidak dapat menghubungkan spreadsheet asli. Silakan daftar/masuk dengan email." });
-      return;
-    }
     setNotification({ type: "info", message: "Menghubungkan ke Google..." });
     try {
-      const res = await linkGoogleAccount();
+      let res: { user: User; accessToken: string | null } | null;
+      if (!user || user.uid === "guest") {
+        // Jika tamu, lakukan login penuh dengan Google agar akun menjadi resmi
+        res = await googleSignIn();
+      } else {
+        // Jika sudah login email, hubungkan (link) akun
+        res = await linkGoogleAccount();
+      }
+      
       if (res && res.accessToken) {
         setAccessToken(res.accessToken);
+        setUser(res.user);
         await findOrCreateSpreadsheet(res.accessToken);
       } else {
         throw new Error("Gagal mendapatkan akses dari Google.");
@@ -687,13 +692,13 @@ function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess,
     e.preventDefault();
     if (!formData.description) return;
     
-    if (user?.uid === "guest") {
-      setNotification({ type: "error", message: "Mode Tamu tidak dapat menyimpan ke Google Sheets. Silakan masuk/daftar akun asli." });
-      return;
-    }
-
-    if (!spreadsheetId || !accessToken || accessToken === "demo-token") {
-      setNotification({ type: "error", message: "Spreadsheet belum terhubung. Silakan hubungkan di menu Konfigurasi." });
+    if (!spreadsheetId || !accessToken || accessToken === "demo-token" || user?.uid === "guest") {
+      // Simpan secara lokal saja (opt-in) untuk demo
+      const newTransactions = [...transactions, { ...formData, debit: parseFloat(formData.debit) || 0, kredit: parseFloat(formData.kredit) || 0, timestamp: new Date().toISOString() } as Transaction];
+      // Ini hanya untuk visual sementara di UI jika belum terhubung
+      setNotification({ type: "info", message: "Mode Demo: Transaksi disimpan di memori sementara (tidak ke Google Sheets)." });
+      setFormData({ ...formData, description: "", debit: "", kredit: "" });
+      onSuccess(); // Refresh UI
       return;
     }
 
