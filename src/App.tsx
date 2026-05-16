@@ -41,6 +41,8 @@ import {
   Legend 
 } from "recharts";
 
+import { findSpreadsheet, createSpreadsheet, readSheetValues, appendSheetValues } from "./services/googleSheets.ts";
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function App() {
       (user, token) => {
         setUser(user);
         setAccessToken(token);
-        findOrCreateSpreadsheet(token);
+        if (token) findOrCreateSpreadsheet(token);
       },
       () => {
         setUser(null);
@@ -84,27 +86,14 @@ export default function App() {
   const findOrCreateSpreadsheet = async (token: string) => {
     setIsSyncing(true);
     try {
-      const res = await fetch("/api/sheets/find", {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error("Gagal mencari file di Google Drive.");
-      const files = await res.json();
+      const files = await findSpreadsheet(token);
       
       if (files && files.length > 0) {
         setSpreadsheetId(files[0].id);
         await fetchData(files[0].id, token);
         setNotification({ type: "success", message: "Spreadsheet ditemukan dan data dimuat." });
       } else {
-        const createRes = await fetch("/api/sheets/query", {
-          method: "POST",
-          headers: { 
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}` 
-          },
-          body: JSON.stringify({ action: "create" })
-        });
-        if (!createRes.ok) throw new Error("Gagal membuat spreadsheet baru.");
-        const newSheet = await createRes.json();
+        const newSheet = await createSpreadsheet(token);
         setSpreadsheetId(newSheet.spreadsheetId);
         await fetchData(newSheet.spreadsheetId, token);
         setNotification({ type: "success", message: "Spreadsheet baru berhasil dibuat!" });
@@ -125,15 +114,7 @@ export default function App() {
     }
     setIsSyncing(true);
     try {
-      const res = await fetch("/api/sheets/query", {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}` 
-        },
-        body: JSON.stringify({ action: "read", spreadsheetId: sid, range: "INPUT!A2:I" })
-      });
-      const data = await res.json();
+      const data = await readSheetValues(sid, "INPUT!A2:I", token);
       if (data.values) {
         const mapped: Transaction[] = data.values.map((row: any[]) => ({
           date: row[0] || "",
@@ -156,6 +137,7 @@ export default function App() {
       setIsSyncing(false);
     }
   };
+
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -677,7 +659,7 @@ function TransactionPanel({ spreadsheetId, accessToken, transactions, onSuccess 
     setIsSubmitting(true);
     try {
       const values = [[formData.date, formData.month, formData.quarter, formData.category, formData.accountType, formData.description, parseFloat(formData.debit) || 0, parseFloat(formData.kredit) || 0, new Date().toISOString()]];
-      await fetch("/api/sheets/query", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ action: "append", spreadsheetId, range: "INPUT!A2:I", values }) });
+      await appendSheetValues(spreadsheetId, "INPUT!A2:I", values, accessToken);
       setFormData({ ...formData, description: "", debit: "", kredit: "" });
       onSuccess();
     } catch (err) { console.error(err); } finally { setIsSubmitting(false); }
@@ -905,11 +887,7 @@ function SettingsPanel({
         // Push to spreadsheet if connected
         if (spreadsheetId && accessToken) {
           const values = importedData.map(t => [t.date, t.month, t.quarter, t.category, t.accountType, t.description, t.debit, t.kredit, t.timestamp]);
-          await fetch("/api/sheets/query", { 
-            method: "POST", 
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, 
-            body: JSON.stringify({ action: "append", spreadsheetId, range: "INPUT!A2:I", values }) 
-          });
+          await appendSheetValues(spreadsheetId, "INPUT!A2:I", values, accessToken);
           onImportSuccess();
         } else {
           // If not connected, we can't really persist permanently unless we have a local storage sync
@@ -977,11 +955,7 @@ function SettingsPanel({
              ];
              const values = demoData.map(t => [t.date, t.month, t.quarter, t.category, t.accountType, t.description, t.debit, t.kredit, t.timestamp]);
              if (spreadsheetId && accessToken) {
-                fetch("/api/sheets/query", { 
-                  method: "POST", 
-                  headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` }, 
-                  body: JSON.stringify({ action: "append", spreadsheetId, range: "INPUT!A2:I", values }) 
-                }).then(() => onImportSuccess());
+                appendSheetValues(spreadsheetId, "INPUT!A2:I", values, accessToken).then(() => onImportSuccess());
              } else {
                alert("Data simulasi berhasil dimuat ke cache. Hubungkan spreadsheet untuk permanen.");
              }
