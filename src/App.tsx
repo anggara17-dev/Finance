@@ -9,6 +9,7 @@ import {
   LogOut,
   RefreshCcw,
   Loader2,
+  AlertTriangle,
   TrendingUp,
   TrendingDown,
   Scale,
@@ -29,6 +30,7 @@ import { initAuth, googleSignIn, logout, getAccessToken, emailSignIn, emailSignU
 import { User } from "firebase/auth";
 import { Transaction, CATEGORIES_LIST, ACCOUNT_TYPES, getQuarter, QUARTERS_LIST, MONTHS, getMonthName } from "./types.ts";
 import { format } from "date-fns";
+import firebaseConfig from "../firebase-applet-config.json";
 import { 
   BarChart, 
   Bar, 
@@ -55,6 +57,21 @@ export default function App() {
     const saved = localStorage.getItem("local_transactions");
     return saved ? JSON.parse(saved) : [];
   });
+
+  // Project Change Detection & Cleanup
+  useEffect(() => {
+    const configProjectId = firebaseConfig.projectId;
+    const lastProjectId = localStorage.getItem("app_project_id");
+    if (lastProjectId && lastProjectId !== configProjectId) {
+      console.log("Project change detected. Clearing stored data...");
+      localStorage.clear();
+      localStorage.setItem("app_project_id", configProjectId);
+      window.location.reload();
+    } else if (!lastProjectId) {
+      localStorage.setItem("app_project_id", configProjectId);
+    }
+  }, []);
+
   const [appName, setAppName] = useState(() => localStorage.getItem("appName") || "Keuangan 2026");
   const [isSyncing, setIsSyncing] = useState(false);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
@@ -1070,29 +1087,44 @@ function SettingsPanel({
             <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">1</span>
             <h4 className="text-xs font-bold uppercase mb-2">Izin Domain</h4>
             <p className="text-[11px] text-text-secondary leading-relaxed space-y-1">
-              Tambahkan domain berikut ke <b>Authorized Domains</b>:<br/>
-              • <code>ais-dev-w7wuhgfrwkv3mzs5twzneb-637063996796.asia-southeast1.run.app</code><br/>
-              • <code>ais-pre-w7wuhgfrwkv3mzs5twzneb-637063996796.asia-southeast1.run.app</code><br/>
-              • <code>anggara17-dev.github.io</code>
+              Tambahkan domain aplikasi ini ke <b>Authorized Domains</b> di Firebase Console agar Login Google berhasil:<br/>
+              • <code className="bg-white px-1 select-all">{window.location.hostname}</code><br/>
+              • <code className="bg-white px-1 select-all">anggara17-dev.github.io</code>
             </p>
           </div>
           <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
             <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">2</span>
-            <h4 className="text-xs font-bold uppercase mb-2">PENTING: Project ID</h4>
+            <h4 className="text-xs font-bold uppercase mb-2">Google Drive API</h4>
             <p className="text-[11px] text-text-secondary leading-relaxed">
-              Pastikan Anda membuka project Firebase ID: <b>moneysave-923ea</b>. <br/>
-              Lalu di <b>Sign-in Methods</b>, aktifkan <b>Google</b> & <b>Email</b>.
+              Buka <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noreferrer" className="text-blue-600 underline">Google Cloud Console</a>, pastikan <b>Google Drive API</b> dan <b>Google Sheets API</b> sudah di-klik <b>ENABLE</b>.
             </p>
           </div>
           <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
             <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">3</span>
-            <h4 className="text-xs font-bold uppercase mb-2">Link Drive</h4>
+            <h4 className="text-xs font-bold uppercase mb-2">Izin Saat Login</h4>
             <p className="text-[11px] text-text-secondary leading-relaxed">
-              Saat muncul popup Google, pastikan Anda mencentang izin <b>"Melihat, membuat, dan menghapus file Google Drive Anda"</b> agar data bisa disimpan.
+              Saat popup Google muncul, <b>WAJIB</b> centang izin: <br/> 
+              <i>"Melihat, membuat, dan menghapus file Google Drive"</i>. Jika tidak dicentang, sinkronisasi akan Gagal/Failed.
             </p>
           </div>
         </div>
       </div>
+
+      <section className="bg-bg-primary border border-border-tertiary rounded-xl p-6">
+        <h3 className="flex items-center gap-2 font-bold mb-4 text-rose-600"><AlertTriangle size={18} /> Pemulihan & Reset</h3>
+        <p className="text-xs text-text-secondary mb-4 italic">Jika aplikasi terus error setelah ganti project Firebase, gunakan tombol di bawah ini untuk membersihkan cache browser.</p>
+        <button 
+          onClick={() => {
+            if (confirm("Hapus semua data cache dan reset login? Data di Google Sheets akan tetap aman.")) {
+              localStorage.clear();
+              window.location.reload();
+            }
+          }}
+          className="w-full py-3 border-2 border-rose-200 text-rose-600 rounded-lg text-sm font-bold hover:bg-rose-50 transition-all flex items-center justify-center gap-2"
+        >
+          <RefreshCcw size={16} /> Hard Reset App (Hapus Cache & Keluar)
+        </button>
+      </section>
       <section className="bg-bg-primary border border-border-tertiary rounded-xl p-6">
         <h3 className="flex items-center gap-2 font-bold mb-4 text-text-primary"><Settings size={18} /> Identitas App</h3>
         <input type="text" value={appName} onChange={e => setAppName(e.target.value)} className="w-full border p-2.5 rounded bg-bg-secondary text-sm outline-none focus:border-[#185FA5]" />
