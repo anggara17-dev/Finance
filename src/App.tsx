@@ -95,10 +95,14 @@ export default function App() {
         setUser(user);
         setAccessToken(token);
         if (token) {
-          if (spreadsheetId) {
-            await fetchData(spreadsheetId, token);
-          } else {
-            await findOrCreateSpreadsheet(token);
+          try {
+            if (spreadsheetId) {
+              await fetchData(spreadsheetId, token);
+            } else {
+              await findOrCreateSpreadsheet(token);
+            }
+          } finally {
+            setIsLoading(false);
           }
         } else if (user && user.uid !== "guest") {
           // Logged in but missing token? might need re-login but let's just stop loading
@@ -203,6 +207,7 @@ export default function App() {
       }
     } finally {
       setIsSyncing(false);
+      setIsLoading(false);
     }
   };
 
