@@ -5,6 +5,7 @@ import {
   PieChart, 
   FileText, 
   ShieldCheck, 
+  ShieldAlert,
   LogOut,
   RefreshCcw,
   Loader2,
@@ -20,7 +21,8 @@ import {
   Lock,
   UserPlus,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  HelpCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { initAuth, googleSignIn, logout, getAccessToken, emailSignIn, emailSignUp, linkGoogleAccount, resetPassword } from "./lib/firebase.ts";
@@ -98,12 +100,19 @@ export default function App() {
   }, [spreadsheetId]);
 
   useEffect(() => {
-    if (spreadsheetId) {
-      localStorage.setItem("google_spreadsheet_id", spreadsheetId);
-    } else {
-      localStorage.removeItem("google_spreadsheet_id");
+    localStorage.setItem("google_spreadsheet_id", spreadsheetId || "");
+    if (spreadsheetId && accessToken && accessToken !== "demo-token") {
+       fetchData(spreadsheetId, accessToken);
     }
   }, [spreadsheetId]);
+
+  useEffect(() => {
+    if (activeTab === "DASHBOARD" || activeTab === "REKAP" || activeTab === "INPUT") {
+      if (spreadsheetId && accessToken && accessToken !== "demo-token") {
+        fetchData(spreadsheetId, accessToken);
+      }
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     if (user?.uid === "guest" || !spreadsheetId || !accessToken || accessToken === "demo-token") {
@@ -522,15 +531,28 @@ export default function App() {
             >
               {activeTab === "DASHBOARD" && <DashboardPanel transactions={transactions} />}
               {activeTab === "INPUT" && (
-                <TransactionPanel 
-                  spreadsheetId={spreadsheetId!} 
-                  accessToken={accessToken!} 
-                  transactions={transactions}
-                  setTransactions={setTransactions}
-                  setNotification={setNotification}
-                  user={user}
-                  onSuccess={() => fetchData(spreadsheetId!, accessToken!)} 
-                />
+                <>
+                  {(user?.uid === "guest" || !accessToken || accessToken === "demo-token") && (
+                    <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                      <div className="mt-0.5 text-amber-600"><ShieldAlert size={20} /></div>
+                      <div>
+                        <h4 className="text-sm font-bold text-amber-900">Mode Penyimpanan Lokal (Offline)</h4>
+                        <p className="text-[12px] text-amber-800 leading-relaxed mt-1">
+                          Data saat ini tersimpan di browser Anda. Hubungkan akun Google di menu <b>Konfigurasi</b> untuk sinkronisasi otomatis ke Google Sheets.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  <TransactionForm 
+                    spreadsheetId={spreadsheetId!} 
+                    accessToken={accessToken!} 
+                    transactions={transactions}
+                    setTransactions={setTransactions}
+                    setNotification={setNotification}
+                    user={user}
+                    onSuccess={() => fetchData(spreadsheetId!, accessToken!)} 
+                  />
+                </>
               )}
               {activeTab === "REKAP" && <RekapPanel transactions={transactions} />}
               {activeTab === "LABA_RUGI" && <LabaRugiPanel transactions={transactions} />}
@@ -743,7 +765,7 @@ function StatCard({ label, val, color = "text-text-primary", isCurrency = true }
   );
 }
 
-function TransactionPanel({ spreadsheetId, accessToken, transactions, setTransactions, onSuccess, setNotification, user }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], setTransactions: (t: Transaction[]) => void, onSuccess: () => void, setNotification: any, user: any }) {
+function TransactionForm({ spreadsheetId, accessToken, transactions, setTransactions, onSuccess, setNotification, user }: { spreadsheetId: string, accessToken: string, transactions: Transaction[], setTransactions: (t: Transaction[]) => void, onSuccess: () => void, setNotification: any, user: any }) {
   const [formData, setFormData] = useState({ date: format(new Date(), "yyyy-MM-dd"), month: getMonthName(new Date().toISOString()), quarter: getQuarter(new Date().toISOString()), category: CATEGORIES_LIST[0], accountType: ACCOUNT_TYPES[0], description: "", debit: "", kredit: "" });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -980,7 +1002,7 @@ function SettingsPanel({
     if (!newSid) return;
     setSpreadsheetId(newSid);
     if (!accessToken || accessToken === "demo-token") {
-      setNotification({ type: "success", message: "ID Spreadsheet diperbarui secara lokal. Silakan 'Hubungkan Google' untuk sinkronisasi data." });
+      setNotification({ type: "success", message: "ID Spreadsheet diperbarui secara lokal. Data akan tersimpan di browser Anda." });
     } else {
       setNotification({ type: "success", message: "ID Spreadsheet diperbarui. Mencoba sinkronisasi..." });
       onImportSuccess();
@@ -1031,6 +1053,42 @@ function SettingsPanel({
 
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-10">
+      {/* Setup Guide Card */}
+      <div className="bg-white border-2 border-dashed border-[#185FA5]/30 rounded-2xl p-6 mb-8">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-[#185FA5]/10 rounded-lg flex items-center justify-center text-[#185FA5]">
+            <HelpCircle size={24} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-text-primary">Panduan Penting Aktivasi</h3>
+            <p className="text-sm text-text-secondary">Lakukan ini agar fitur Simpan & Login berfungsi normal</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
+            <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">1</span>
+            <h4 className="text-xs font-bold uppercase mb-2">Izin Domain</h4>
+            <p className="text-[11px] text-text-secondary leading-relaxed">
+              Buka Firebase Console &gt; Auth &gt; Settings &gt; <b>Authorized Domains</b>. Tambahkan domain GitHub Anda (<code>anggara17-dev.github.io</code>).
+            </p>
+          </div>
+          <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
+            <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">2</span>
+            <h4 className="text-xs font-bold uppercase mb-2">Enable Provider</h4>
+            <p className="text-[11px] text-text-secondary leading-relaxed">
+              Di Firebase Console &gt; Auth &gt; <b>Sign-in Methods</b>. Aktifkan (Enable) <b>Google</b> dan <b>Email/Password</b>.
+            </p>
+          </div>
+          <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
+            <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">3</span>
+            <h4 className="text-xs font-bold uppercase mb-2">Link Drive</h4>
+            <p className="text-[11px] text-text-secondary leading-relaxed">
+              Saat muncul popup Google, pastikan Anda mencentang izin <b>"Melihat, membuat, dan menghapus file Google Drive Anda"</b> agar data bisa disimpan.
+            </p>
+          </div>
+        </div>
+      </div>
       <section className="bg-bg-primary border border-border-tertiary rounded-xl p-6">
         <h3 className="flex items-center gap-2 font-bold mb-4 text-text-primary"><Settings size={18} /> Identitas App</h3>
         <input type="text" value={appName} onChange={e => setAppName(e.target.value)} className="w-full border p-2.5 rounded bg-bg-secondary text-sm outline-none focus:border-[#185FA5]" />
