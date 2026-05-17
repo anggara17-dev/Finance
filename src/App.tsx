@@ -1069,15 +1069,19 @@ function SettingsPanel({
           <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
             <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">1</span>
             <h4 className="text-xs font-bold uppercase mb-2">Izin Domain</h4>
-            <p className="text-[11px] text-text-secondary leading-relaxed">
-              Buka Firebase Console &gt; Auth &gt; Settings &gt; <b>Authorized Domains</b>. Tambahkan domain GitHub Anda (<code>anggara17-dev.github.io</code>).
+            <p className="text-[11px] text-text-secondary leading-relaxed space-y-1">
+              Tambahkan domain berikut ke <b>Authorized Domains</b>:<br/>
+              • <code>ais-dev-w7wuhgfrwkv3mzs5twzneb-637063996796.asia-southeast1.run.app</code><br/>
+              • <code>ais-pre-w7wuhgfrwkv3mzs5twzneb-637063996796.asia-southeast1.run.app</code><br/>
+              • <code>anggara17-dev.github.io</code>
             </p>
           </div>
           <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
             <span className="inline-block w-6 h-6 bg-[#185FA5] text-white text-xs font-bold rounded-full flex items-center justify-center mb-3">2</span>
-            <h4 className="text-xs font-bold uppercase mb-2">Enable Provider</h4>
+            <h4 className="text-xs font-bold uppercase mb-2">PENTING: Project ID</h4>
             <p className="text-[11px] text-text-secondary leading-relaxed">
-              Di Firebase Console &gt; Auth &gt; <b>Sign-in Methods</b>. Aktifkan (Enable) <b>Google</b> dan <b>Email/Password</b>.
+              Pastikan Anda membuka project Firebase ID: <b>moneysave-923ea</b>. <br/>
+              Lalu di <b>Sign-in Methods</b>, aktifkan <b>Google</b> & <b>Email</b>.
             </p>
           </div>
           <div className="bg-bg-secondary p-4 rounded-xl border border-border-tertiary">
